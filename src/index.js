@@ -1,60 +1,43 @@
-const path = require('path');
 const express = require('express');
 const morgan = require('morgan');
-const { engine } = require('express-handlebars');
-const mongoose = require("mongoose");
+const fileUpload = require('express-fileupload');
 const bodyParser = require('body-parser');
-const BlogPost = require('./models/BlogPost');
+const path = require('path');
+const expressSession = require('express-session');
+
+const blogRoutes = require('./routes/blogRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
-const port = 3000;
 
-mongoose.connect('mongodb://localhost/my_database', {useNewUrlParser: true});
-
-// ===== Middleware ===== //
+// Middleware
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(morgan('combined'));
+app.use(morgan('dev'));
+app.use(fileUpload());
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({extend:true}));
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(expressSession({ secret: 'keyboard cat' }));
 
-
-
-// ===== Template Engine ===== //
+// Template engine
+const { engine } = require('express-handlebars');
 app.engine('hbs', engine({ extname: '.hbs' }));
 app.set('view engine', 'hbs');
 app.set('views', path.join(__dirname, 'resources/views'));
 
-async function run(res) {
- 
-}
-
-// ===== Routes ===== //
-app.get('/home', (req, res) => res.render('home'));
-
-app.get('/news', (req, res) => res.render('news'));
-
-app.get('/post/create', (req, res) => res.render('create'));
-
-app.post('/post/create', async (req, res) => {
-  try {
-    await BlogPost.create(req.body); 
-    res.redirect('/home');
-  } catch (error) {
-    console.error('Lỗi tạo blog post:', error);
-    res.status(500).send('Có lỗi xảy ra khi tạo bài viết');
-  }
+// Truyền biến loggedIn vào mọi view
+app.use((req, res, next) => {
+  res.locals.loggedIn = req.session.userId || null;
+  next();
 });
 
-app.get('/about', (req, res) => {
-  res.json({ name: 'Hoang Pham', age: 26 });
-});
+// Routes
+app.use('/', blogRoutes);
+app.use('/auth', authRoutes);
 
-// 404 handler (should always be last)
+// 404 fallback
 app.use((req, res) => {
-  res.status(404).send('Page not found');
+  // res.status(404).send("Page not found");
+  res.render("notFound");
 });
 
-// ===== Start Server ===== //
-app.listen(port, () => {
-  console.log(`Server is running at http://localhost:${port}`);
-});
+module.exports = app;
